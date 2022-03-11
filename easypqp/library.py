@@ -444,9 +444,9 @@ def generate(files, outfile, psmtsv, peptidetsv, rt_referencefile, rt_reference_
       meta_global = pepidb[pepidb['base_name'] == peak_file['base_name']]
       peaks = pd.read_pickle(peak_file['path'])
       peaks['modified_peptide'], _ = unify_modified_peptide_masses(peaks['modified_peptide'], transform_mass)
-      # Generate run-specific PQP files for OpenSWATH alignment
+      merge_on = ['modified_peptide', 'precursor_charge', 'scan_id']
       if consensus or ("_Q1" in peak_file['base_name']):
-        run_pqp = pd.merge(meta_run, peaks, on=['modified_peptide','precursor_charge','scan_id'])[['precursor_mz','product_mz','fragment','intensity','irt','im','protein_id','gene_id','peptide_sequence','modified_peptide','precursor_charge']]
+        run_pqp = pd.merge(meta_run, peaks, on=merge_on)[['precursor_mz','product_mz','fragment','intensity','irt','im','protein_id','gene_id','peptide_sequence','modified_peptide','precursor_charge']]
         run_pqp.columns = ['PrecursorMz','ProductMz','Annotation','LibraryIntensity','NormalizedRetentionTime','PrecursorIonMobility','ProteinId','GeneName','PeptideSequence','ModifiedPeptideSequence','PrecursorCharge']
         run_pqp['PrecursorCharge'] = run_pqp['PrecursorCharge'].astype(int)
         run_pqp_path = os.path.splitext(peak_file['path'])[0]+"_run_peaks.tsv"
@@ -456,7 +456,7 @@ def generate(files, outfile, psmtsv, peptidetsv, rt_referencefile, rt_reference_
 
       # Generate global non-redundant PQP files
       if not consensus:
-        global_pqp = pd.merge(meta_global, peaks, on=['modified_peptide','precursor_charge','scan_id'])[['precursor_mz','product_mz','fragment','intensity','irt','im','protein_id','gene_id','peptide_sequence','modified_peptide','precursor_charge']]
+        global_pqp = pd.merge(meta_global, peaks, on=merge_on)[['precursor_mz','product_mz','fragment','intensity','irt','im','protein_id','gene_id','peptide_sequence','modified_peptide','precursor_charge']]
         global_pqp.columns = ['PrecursorMz','ProductMz','Annotation','LibraryIntensity','NormalizedRetentionTime','PrecursorIonMobility','ProteinId','GeneName','PeptideSequence','ModifiedPeptideSequence','PrecursorCharge']
         global_pqp['PrecursorCharge'] = global_pqp['PrecursorCharge'].astype(int)
         replicate_pqp.append(global_pqp)

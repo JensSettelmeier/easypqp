@@ -427,12 +427,14 @@ def read_mgf(tims_mgf_path, psms, theoretical, max_delta_ppm):
 	read TimsTOF's MGF or MSFragger's calibrated.mgf
 	'''
 	is_tims = not tims_mgf_path.endswith('calibrated.mgf')
+	is_pseudo_mgf = tims_mgf_path.casefold().endswith('_pseudo.mgf')
 	import mmap
 	record_pattern = re.compile(b'''BEGIN IONS\r?
 (.*?)
 END IONS''', re.MULTILINE | re.DOTALL)
 	scan_num_pattern_Bruker = re.compile(rb'TITLE=Cmpd\s+([0-9]+),')
 	scan_num_pattern_general = re.compile(rb'TITLE=.+?\.([0-9]+?)\.')
+	rank_pattern = re.compile(rb'RANK=([0-9]+?)')
 	peaks_pattern = re.compile(rb'^([\d.]+)\s+([\d.]+)', re.MULTILINE)
 
 	tims_data = {}
@@ -447,11 +449,12 @@ END IONS''', re.MULTILINE | re.DOTALL)
 				raise RuntimeError("Cannot find Cmpd number from " + rec.decode()
 								   if is_tims else
 								   "Cannot find scan number from " + rec.decode())
-			tims_data[scan_num] = np.array(peaks_pattern.findall(rec), dtype=float)
+			rank: int = int(rank_pattern.findall(rec)[0]) if is_pseudo_mgf else 1
+			tims_data[scan_num, rank] = np.array(peaks_pattern.findall(rec), dtype=float)
 
 	peaks_list = []
-	for scan_id, modified_peptide, precursor_charge in psms.itertuples(index=False):
-		peaks_list.append(psm_df_mgf(tims_data, theoretical, max_delta_ppm, scan_id, modified_peptide, precursor_charge))
+	for scan_id, modified_peptide, precursor_charge, hit_rank in psms.itertuples(index=False):
+		peaks_list.append(psm_df_mgf(tims_data, hit_rank, theoretical, max_delta_ppm, scan_id, modified_peptide, precursor_charge))
 
 	if len(peaks_list) > 0:
 		reps = np.array([e[0] for e in peaks_list])
@@ -496,10 +499,10 @@ def psm_df(input_map, theoretical, max_delta_ppm, scan_id, modified_peptide, pre
 				.getMonoWeight(po.Residue.ResidueType.Full, precursor_charge) / precursor_charge,
 			modified_peptide, precursor_charge]
 
-def psm_df_mgf(input_map, theoretical, max_delta_ppm, scan_id, modified_peptide, precursor_charge):
+def psm_df_mgf(input_map, hit_rank, theoretical, max_delta_ppm, scan_id, modified_peptide, precursor_charge):
 	ionseries = theoretical[modified_peptide][precursor_charge]
 
-	spectrum = input_map[scan_id]
+	spectrum = input_map[scan_id, hit_rank]
 
 	top_delta = 30
 	ions, ion_masses = ionseries
@@ -609,7 +612,8 @@ def conversion(pepxmlfile, spectralfile, unimodfile, exclude_range, max_delta_un
 		rank = re.compile(r'_rank([0-9]+)\.').search(pathlib.Path(pepxmlfile).name)
 		rank_str = '' if rank is None else '_rank' + rank.group(1)
 		psms['group_id'] = psms['run_id'] + "_" + psms['scan_id'].astype(str) + rank_str
-
+		if rank is not None:
+			psms['hit_rank'] = int(rank.group(1))
 		# Generate theoretical spectra
 		click.echo("Info: Generate theoretical spectra.")
 		theoretical = {}
@@ -624,7 +628,7 @@ def conversion(pepxmlfile, spectralfile, unimodfile, exclude_range, max_delta_un
 		elif spectralfile.casefold().endswith(".mzml"):
 			peaks = read_mzml_or_mzxml_impl(spectralfile, psms[['scan_id', 'modified_peptide', 'precursor_charge']], theoretical, max_delta_ppm, 'mzml')
 		elif spectralfile.lower().endswith(".mgf"):
-			peaks = read_mgf(spectralfile, psms[['scan_id', 'modified_peptide', 'precursor_charge']], theoretical, max_delta_ppm)
+			peaks = read_mgf(spectralfile, psms[['scan_id', 'modified_peptide', 'precursor_charge', 'hit_rank']], theoretical, max_delta_ppm)
 
 		# Round floating numbers
 		peaks = peaks.round(6)
@@ -640,6 +644,8 @@ def basename_spectralfile(spectralfile):
 	:param spectralfile: name of spectral file
 	:return: basename without trailing `_calibrated`
 	'''
+	if spectralfile.casefold().endswith('_pseudo.mgf'):
+		spectralfile = spectralfile[:-len('_pseudo.mgf')]
 	x = os.path.splitext(os.path.basename(spectralfile))[0]
 	# get basename without _(un)calibrated suffix, if any
 	return re.compile('(.+?)(?:_(?:un)?calibrated)?').fullmatch(x)[1]
