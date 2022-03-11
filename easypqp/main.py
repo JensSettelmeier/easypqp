@@ -72,9 +72,11 @@ def convert(pepxmlfile, spectralfile, unimodfile, psmsfile, peaksfile, exclude_r
     psms, peaks = conversion(pepxmlfile, spectralfile, unimodfile, exclude_range, max_delta_unimod, max_delta_ppm, enable_unannotated, enable_massdiff, fragment_types, fragment_charges, enable_specific_losses, enable_unspecific_losses, max_psm_pep)
 
     psms.to_pickle(psmsfile)
+    psms.to_csv(psmsfile+'.tsv', index=False, sep='\t')
     click.echo("Info: PSMs successfully converted and stored in %s." % psmsfile)
 
     peaks.to_pickle(peaksfile)
+    peaks.to_csv(peaksfile+'.tsv', index=False, sep='\t')
     click.echo("Info: Peaks successfully converted and stored in %s." % peaksfile)
 
 # EasyPQP Library
