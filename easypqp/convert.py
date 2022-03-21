@@ -464,9 +464,10 @@ END IONS''', re.MULTILINE | re.DOTALL)
 									'scan_id': np.repeat([e[4] for e in peaks_list], reps),
 									'precursor_mz': np.repeat([e[5] for e in peaks_list], reps),
 									'modified_peptide': np.repeat([e[6] for e in peaks_list], reps),
-									'precursor_charge': np.repeat([e[7] for e in peaks_list], reps)})
+									'precursor_charge': np.repeat([e[7] for e in peaks_list], reps),
+									'hit_rank':  np.repeat([e[8] for e in peaks_list], reps)})
 		# Multiple peaks might be identically annotated, only use most intense
-		transitions = transitions.groupby(['scan_id','modified_peptide','precursor_charge','precursor_mz','fragment','product_mz'])['intensity'].max().reset_index()
+		transitions = transitions.groupby(['scan_id','modified_peptide','precursor_charge','precursor_mz','fragment','product_mz', 'hit_rank'])['intensity'].max().reset_index()
 	else:
 		transitions = pd.DataFrame({'scan_id': [], 'modified_peptide': [], 'precursor_charge': [], 'precursor_mz': [], 'fragment': [], 'product_mz': [], 'intensity': []})
 	return transitions
@@ -522,7 +523,7 @@ def psm_df_mgf(input_map, hit_rank, theoretical, max_delta_ppm, scan_id, modifie
 			scan_id,
 			po.AASequence.fromString(po.String(modified_peptide))
 				.getMonoWeight(po.Residue.ResidueType.Full, precursor_charge) / precursor_charge,
-			modified_peptide, precursor_charge]
+			modified_peptide, precursor_charge, hit_rank]
 
 
 def annotate_mass_spectrum(ionseries, max_delta_ppm, spectrum):
